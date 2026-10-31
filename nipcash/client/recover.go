@@ -164,7 +164,10 @@ type ReplaceOptions struct {
 	// ChainTip 0, a cash_withdraw's quote then counts as valid until a call of
 	// this withdrawal was refused quote_expired (NIP-CP §Lookups), which Recover
 	// closes as ActionCloseRefused, so Replace re-places it without Confirmed.
-	// A call whose LastDetail is quote_expired is still shown (quote_expired).
+	// A call whose LastDetail is quote_expired or quote_invalid is still shown
+	// (quote_expired, quote_invalid), so its user can get a new quote: an error
+	// answer to a cash_withdraw is never re-placed with the same quote
+	// (NIP-CASH §Withdrawals).
 	NoChainView bool
 }
 
@@ -295,6 +298,8 @@ func Replace(ctx context.Context, pc nipcash.PendingCall, j Journal, o ReplaceOp
 			return Action{Kind: ActionShow, Reason: "quote_expired"}, nil
 		case o.ChainTip <= 0 && o.NoChainView && o.Quote == nil && pc.LastDetail == nipcash.DetailQuoteExpired:
 			return Action{Kind: ActionShow, Reason: "quote_expired"}, nil
+		case o.ChainTip <= 0 && o.NoChainView && o.Quote == nil && pc.LastDetail == nipcash.DetailQuoteInvalid:
+			return Action{Kind: ActionShow, Reason: "quote_invalid"}, nil
 		case o.ChainTip <= 0 && !o.Confirmed && !o.NoChainView:
 			return Action{Kind: ActionShow, Reason: "quote_unchecked"}, nil
 		}
