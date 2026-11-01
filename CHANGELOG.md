@@ -1003,6 +1003,10 @@ privacy and performance fixes.
 
 ### Fixed
 
+- Fixes a no-chain-view `Replace` re-placing a withdrawal refused `quote_invalid`
+  with the same quote; like `quote_expired` it is now shown, so its user can get a
+  new quote.
+  ([#227](https://github.com/ohstr/nmilat/pull/227))
 - Fixes `nip98.Verify` accepting a pubkey in upper or mixed case, a second
   spelling of one key, and reading an Authorization header of any size: it
   refuses both, the header past `nip98.MaxHeader` (16 KiB), and checks every
