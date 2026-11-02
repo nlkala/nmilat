@@ -68,8 +68,13 @@ type Request struct {
 
 // Response is the reply. Per the spec a failure is still HTTP 200 with error
 // set; only an authentication failure is a status code (401).
+//
+// Result has no omitempty, so an error serializes as {"result":null,"error":
+// "<message>"} rather than dropping the field: a client can read result
+// unconditionally and need not treat a missing key differently from a null one.
+// Error keeps omitempty, so a success is {"result":<value>} with no error key.
 type Response struct {
-	Result any    `json:"result,omitempty"`
+	Result any    `json:"result"`
 	Error  string `json:"error,omitempty"`
 }
 
