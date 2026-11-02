@@ -650,6 +650,10 @@ privacy and performance fixes.
   a live call. ([#43](https://github.com/ohstr/nmilat/pull/43))
 - Adds `nip86`, the Relay Management API, with `nip86.NewHandler` and CORS for
   browsers. ([#43](https://github.com/ohstr/nmilat/pull/43))
+- Adds `nip86.Config.Authorize`, an optional hook that admits a NIP-98-verified
+  key `AllowedPubkeys` does not list, so a relay can route NIP-86 for its
+  members without listing each as an admin; an error reply now carries `result`
+  as an explicit null. ([#229](https://github.com/ohstr/nmilat/pull/229))
 - Adds `relay.NewQueryHandler`, which serves `POST /query`: NIP-98-signed HTTP
   queries with REQ's access rules. ([#50](https://github.com/ohstr/nmilat/pull/50))
 - Adds `relay.NewEventsHandler`, which serves `POST /events`: one signed event
@@ -1003,6 +1007,10 @@ privacy and performance fixes.
 
 ### Fixed
 
+- Fixes a no-chain-view `Replace` re-placing a withdrawal refused `quote_invalid`
+  with the same quote; like `quote_expired` it is now shown, so its user can get a
+  new quote.
+  ([#227](https://github.com/ohstr/nmilat/pull/227))
 - Fixes `nip98.Verify` accepting a pubkey in upper or mixed case, a second
   spelling of one key, and reading an Authorization header of any size: it
   refuses both, the header past `nip98.MaxHeader` (16 KiB), and checks every

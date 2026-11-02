@@ -666,6 +666,11 @@ func TestT11_49_RecoverReplaceWithdraw(t *testing.T) {
 	if act, err := Replace(ctx, expired, newTestJournal(), ReplaceOptions{NoChainView: true}, send); err != nil || act.Reason != "quote_expired" || sent.RequestID != "" {
 		t.Errorf("no chain view after quote_expired: %+v %v", act, err)
 	}
+	invalid := with(func(p *nipcash.PendingCall) { p.LastDetail = nipcash.DetailQuoteInvalid })
+	sent = nipcash.PendingCall{}
+	if act, err := Replace(ctx, invalid, newTestJournal(), ReplaceOptions{NoChainView: true}, send); err != nil || act.Kind != ActionShow || act.Reason != "quote_invalid" || sent.RequestID != "" {
+		t.Errorf("no chain view after quote_invalid: %+v %v (sent %q)", act, err, sent.RequestID)
+	}
 	if act, err := Replace(ctx, base, newTestJournal(), ReplaceOptions{NoChainView: true, ChainTip: 101}, send); err != nil || act.Reason != "quote_expired" {
 		t.Errorf("no chain view with a known tip past the quote: %+v %v", act, err)
 	}
