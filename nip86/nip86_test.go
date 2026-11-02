@@ -164,6 +164,31 @@ func TestRouter_VisibleHidesAndRefuses(t *testing.T) {
 	}
 }
 
+// An error reply serializes result as an explicit null while a success still
+// carries its result and no error key (change E).
+func TestResponse_JSONShape(t *testing.T) {
+	tests := []struct {
+		name string
+		resp Response
+		want string
+	}{
+		{"error carries a null result", Response{Error: "boom"}, `{"result":null,"error":"boom"}`},
+		{"success carries its result and no error", Response{Result: true}, `{"result":true}`},
+		{"success with a null result is still just result", Response{Result: nil}, `{"result":null}`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := json.Marshal(tc.resp)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			if string(got) != tc.want {
+				t.Fatalf("Response = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
 func noopMethod(context.Context, string, Request) (any, error) { return true, nil }
 
 func rawParams(t *testing.T, params ...string) []json.RawMessage {

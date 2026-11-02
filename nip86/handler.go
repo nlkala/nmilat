@@ -22,6 +22,15 @@ type Config struct {
 	// has configured no admin gets a closed endpoint, not an open one.
 	AllowedPubkeys []string
 
+	// Authorize, when set, admits a verified key that AllowedPubkeys does not
+	// list. NIP-98 still checks the signature, payload and URL for everyone --
+	// this only widens which verified keys are allowed to reach the Router. A
+	// key that Authorize admits but that is not an admin is still filtered
+	// per-method by Router.Visible downstream, so this grants reachability, not
+	// privilege. Nil leaves authorization exactly as AllowedPubkeys alone: only
+	// listed keys pass, and an empty list still refuses everyone.
+	Authorize func(pubkey string) bool
+
 	// AllowedOrigins is the CORS allowlist. Empty answers any origin, which is
 	// safe here because authorization is a signed header rather than a cookie,
 	// so a hostile page gains nothing by being allowed to send the request.
@@ -74,14 +83,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NIP-86 requires the payload tag, and NormalizeRootPath spares a client
-	// that signed the bare relay URL a 401 it could not diagnose.
-	caller, err := nip98.Verify(r, nip98.Options{
-		AllowedPubkeys:    h.cfg.AllowedPubkeys,
-		Body:              body,
-		RequirePayload:    true,
-		NormalizeRootPath: true,
-	})
+	caller, err := h.authorize(r, body)
 	if err != nil {
 		// 401 is the only status code the spec gives this API; every other
 		// failure is a 200 carrying an error field.
@@ -96,6 +98,53 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, h.cfg.Router.Dispatch(r.Context(), caller, req))
+}
+
+// authorize runs NIP-98 over the request and decides whether the verified key
+// may reach the Router. The signature, payload, URL and freshness checks are
+// identical for everyone; only which verified keys are admitted differs.
+func (h *Handler) authorize(r *http.Request, body []byte) (string, error) {
+	// NIP-86 requires the payload tag, and NormalizeRootPath spares a client
+	// that signed the bare relay URL a 401 it could not diagnose.
+	opts := nip98.Options{
+		AllowedPubkeys:    h.cfg.AllowedPubkeys,
+		Body:              body,
+		RequirePayload:    true,
+		NormalizeRootPath: true,
+	}
+
+	// With no Authorize hook, authorization is exactly the AllowedPubkeys gate
+	// nip98.Verify already applies -- unchanged, down to the error it returns,
+	// and an empty list still refuses everyone.
+	if h.cfg.Authorize == nil {
+		return nip98.Verify(r, opts)
+	}
+
+	// With one, Verify's checks still run for everyone: VerifyAnyPubkey applies
+	// the identical signature/payload/URL/freshness checks and only drops the
+	// AllowedPubkeys gate, so a bad signature is still a 401 before Authorize is
+	// ever consulted. A verified key then reaches the Router if it is an admin
+	// OR Authorize admits it; a key that is neither still gets a 401. What a
+	// non-admin may actually call is decided downstream by Router.Visible, not
+	// here.
+	caller, err := nip98.VerifyAnyPubkey(r, opts)
+	if err != nil {
+		return "", err
+	}
+	if h.isAdmin(caller) || h.cfg.Authorize(caller) {
+		return caller, nil
+	}
+	return "", nip98.ErrWrongPubkey
+}
+
+// isAdmin reports whether pubkey is in the AllowedPubkeys list.
+func (h *Handler) isAdmin(pubkey string) bool {
+	for _, p := range h.cfg.AllowedPubkeys {
+		if p == pubkey {
+			return true
+		}
+	}
+	return false
 }
 
 // allowOrigin resolves the Access-Control-Allow-Origin value for origin,
